@@ -1,0 +1,12 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python main.py"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+# Mount a persistent volume at /app/data so the SQLite DB
+# and downloaded files survive redeploys.
+# In Railway dashboard: Settings → Volumes → Mount at /app/data
