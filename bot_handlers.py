@@ -93,52 +93,56 @@ class BotHandlers:
             await msg.reply(HELP_TEXT)
 
         # ── Channel selection ─────────────────────────────────────────────────
+     
+    async def _resolve_channel(self, msg: Message) -> Optional[Dict]:
+        import re
+        text = (msg.text or "").strip()
 
-         async def _resolve_channel(self, msg: Message) -> Optional[Dict]:
-    import re
-    text = (msg.text or "").strip()
+        # Private channel link
+        m = re.search(r't\.me/c/(\d+)/\d+', text)
+        if m:
+            chat_id = int("-100" + m.group(1))
+            try:
+                chat = await self.uc.get_chat(chat_id)
+                return {"id": chat.id, "title": chat.title or str(chat.id)}
+            except Exception as e:
+                logger.warning(f"private link error: {e}")
+                return None
 
-    # t.me/c/CHANNELID/MSGID  (private channel link)
-    m = re.search(r't\.me/c/(\d+)/\d+', text)
-    if m:
-        chat_id = int("-100" + m.group(1))
-        try:
-            chat = await self.uc.get_chat(chat_id)
+        # Public channel link
+        m = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]+)/\d+', text)
+        if m:
+            try:
+                chat = await self.uc.get_chat(m.group(1))
+                return {"id": chat.id, "title": chat.title or str(chat.id)}
+            except Exception as e:
+                logger.warning(f"public link error: {e}")
+                return None
+
+        # Forwarded message
+        if msg.forward_from_chat:
+            chat = msg.forward_from_chat
             return {"id": chat.id, "title": chat.title or str(chat.id)}
-        except Exception as e:
-            logger.warning(f"private link error: {e}")
+
+        # Username or numeric ID
+        if not text:
             return None
 
-    # t.me/username/MSGID  (public channel link)
-    m = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]+)/\d+', text)
-    if m:
         try:
-            chat = await self.uc.get_chat(m.group(1))
-            return {"id": chat.id, "title": chat.title or str(chat.id)}
+            if text.lstrip("-").isdigit():
+                chat = await self.uc.get_chat(int(text))
+                return {"id": chat.id, "title": chat.title or str(chat.id)}
+
+            slug = text.lstrip("@").strip()
+            if slug:
+                chat = await self.uc.get_chat(slug)
+                return {"id": chat.id, "title": chat.title or str(chat.id)}
+
         except Exception as e:
-            logger.warning(f"public link error: {e}")
-            return None
+            logger.warning(f"_resolve_channel error: {e}")
 
-    # forwarded message (backup)
-    if msg.forward_from_chat:
-        chat = msg.forward_from_chat
-        return {"id": chat.id, "title": chat.title or str(chat.id)}
-
-    # @username या numeric ID
-    if not text:
         return None
-    try:
-        if text.lstrip("-").isdigit():
-            chat = await self.uc.get_chat(int(text))
-            return {"id": chat.id, "title": chat.title or str(chat.id)}
-        slug = text.lstrip("@").strip()
-        if slug:
-            chat = await self.uc.get_chat(slug)
-            return {"id": chat.id, "title": chat.title or str(chat.id)}
-    except Exception as e:
-        logger.warning(f"_resolve_channel error: {e}")
-
-    return None
+      
 
         
         # ── Scan ──────────────────────────────────────────────────────────────
