@@ -1,3 +1,4 @@
+
 """
 Bot Handlers - Complete Version
 Pyrogram User Client + Bot Client
@@ -742,4 +743,21 @@ class BotHandlers:
         self,
         uid: int,
         job_id: int,
-       
+        text: str
+    ):
+
+        chat_id = self._notify_chat.get(uid, uid)
+
+        try:
+
+            await self.bot.send_message(
+                chat_id,
+                text
+            )
+
+        except Exception as e:
+
+            logger.warning(
+                "Progress notification failed: %s",
+                e
+            )
