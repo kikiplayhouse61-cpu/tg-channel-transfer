@@ -93,7 +93,8 @@ class BotHandlers:
             await msg.reply(HELP_TEXT)
 
         # ── Channel selection ─────────────────────────────────────────────────
-async def _resolve_channel(self, msg: Message) -> Optional[Dict]:
+
+         async def _resolve_channel(self, msg: Message) -> Optional[Dict]:
     import re
     text = (msg.text or "").strip()
 
@@ -137,7 +138,8 @@ async def _resolve_channel(self, msg: Message) -> Optional[Dict]:
     except Exception as e:
         logger.warning(f"_resolve_channel error: {e}")
 
-    return None 
+    return None
+
         
         # ── Scan ──────────────────────────────────────────────────────────────
 
