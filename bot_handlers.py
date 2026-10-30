@@ -93,69 +93,52 @@ class BotHandlers:
             await msg.reply(HELP_TEXT)
 
         # ── Channel selection ─────────────────────────────────────────────────
+async def _resolve_channel(self, msg: Message) -> Optional[Dict]:
+    import re
+    text = (msg.text or "").strip()
 
-        @bot.on_message(filters.command("setsource") & auth)
-        async def cmd_setsource(_, msg: Message):
-            self._user_state[msg.from_user.id] = "awaiting_source"
-            await msg.reply(
-                "📥 **Set source channel**\n\n"
-                "Send me the channel in one of these ways:\n"
-                "• Forward any post from the channel\n"
-                "• Send @username\n"
-                "• Send numeric ID like `-1001234567890`"
-            )
+    # t.me/c/CHANNELID/MSGID  (private channel link)
+    m = re.search(r't\.me/c/(\d+)/\d+', text)
+    if m:
+        chat_id = int("-100" + m.group(1))
+        try:
+            chat = await self.uc.get_chat(chat_id)
+            return {"id": chat.id, "title": chat.title or str(chat.id)}
+        except Exception as e:
+            logger.warning(f"private link error: {e}")
+            return None
 
-        @bot.on_message(filters.command("setdest") & auth)
-        async def cmd_setdest(_, msg: Message):
-            self._user_state[msg.from_user.id] = "awaiting_dest"
-            await msg.reply(
-                "📤 **Set destination channel**\n\n"
-                "Send me the channel in one of these ways:\n"
-                "• Forward any post from the channel\n"
-                "• Send @username\n"
-                "• Send numeric ID like `-1001234567890`"
-            )
+    # t.me/username/MSGID  (public channel link)
+    m = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]+)/\d+', text)
+    if m:
+        try:
+            chat = await self.uc.get_chat(m.group(1))
+            return {"id": chat.id, "title": chat.title or str(chat.id)}
+        except Exception as e:
+            logger.warning(f"public link error: {e}")
+            return None
 
-        @bot.on_message(auth & ~filters.command([]))
-        async def handle_input(_, msg: Message):
-            uid = msg.from_user.id
-            state = self._user_state.get(uid)
+    # forwarded message (backup)
+    if msg.forward_from_chat:
+        chat = msg.forward_from_chat
+        return {"id": chat.id, "title": chat.title or str(chat.id)}
 
-            if state not in ("awaiting_source", "awaiting_dest"):
-                return
+    # @username या numeric ID
+    if not text:
+        return None
+    try:
+        if text.lstrip("-").isdigit():
+            chat = await self.uc.get_chat(int(text))
+            return {"id": chat.id, "title": chat.title or str(chat.id)}
+        slug = text.lstrip("@").strip()
+        if slug:
+            chat = await self.uc.get_chat(slug)
+            return {"id": chat.id, "title": chat.title or str(chat.id)}
+    except Exception as e:
+        logger.warning(f"_resolve_channel error: {e}")
 
-            channel_info = await self._resolve_channel(msg)
-            if not channel_info:
-                await msg.reply(
-                    "❌ Couldn't identify a channel from that.\n"
-                    "Try forwarding a post from the channel, or send its @username or ID."
-                )
-                return
-
-            if state == "awaiting_source":
-                self._pending_source[uid] = channel_info
-                self._user_state[uid] = None
-                await msg.reply(
-                    f"✅ Source set: **{channel_info['title']}** (`{channel_info['id']}`)\n\n"
-                    "Now use /setdest to set the destination channel."
-                )
-            else:
-                self._pending_dest[uid] = channel_info
-                self._user_state[uid] = None
-                src = self._pending_source.get(uid)
-                if src:
-                    await msg.reply(
-                        f"✅ Destination set: **{channel_info['title']}** (`{channel_info['id']}`)\n\n"
-                        f"**Source:** {src['title']}\n"
-                        f"**Destination:** {channel_info['title']}\n\n"
-                        "Use /scan to begin scanning the source channel."
-                    )
-                else:
-                    await msg.reply(
-                        f"✅ Destination set: **{channel_info['title']}** (`{channel_info['id']}`)\n\n"
-                        "Use /setsource to set the source channel first."
-                    )
-
+    return None 
+        
         # ── Scan ──────────────────────────────────────────────────────────────
 
         @bot.on_message(filters.command("scan") & auth)
